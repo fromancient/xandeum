@@ -6,6 +6,8 @@ import { pNode } from '@/types';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+// Ensure Node runtime on Vercel for Prisma + Node APIs
+export const runtime = 'nodejs';
 
 export async function GET() {
   try {

@@ -4,6 +4,8 @@ import { fetchAllpNodes } from '@/lib/prpc';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+// Ensure Node runtime on Vercel so Prisma native bindings load
+export const runtime = 'nodejs';
 
 export async function GET(req: Request) {
   try {
