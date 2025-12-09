@@ -2,6 +2,11 @@
 
 A comprehensive web-based analytics and monitoring platform for Xandeum pNodes. XPIC provides real-time insights into node health, performance, network topology, and historical trends.
 
+## 📖 Documentation
+
+- **[User Guide (USAGE.md)](./USAGE.md)**: Complete guide on how to use all features of XPIC
+- **This README**: Technical setup and deployment instructions
+
 ## Features
 
 ### Core Features (MVP)
