@@ -1,0 +1,102 @@
+// Prisma schema for XPIC
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model NodeSnapshot {
+  id         String   @id
+  publicKey  String?
+  status     String?
+  version    String?
+  region     String?
+  latitude   Float?
+  longitude  Float?
+  peerCount  Int?
+  isValidator Boolean  @default(false)
+  voteAccount String?
+  commission Int?
+  lastSeen   DateTime?
+  updatedAt  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+}
+
+model MetricSnapshot {
+  id          Int      @id @default(autoincrement())
+  tps         Float?
+  blockTimeMs Float?
+  slot        Int?
+  epoch       Int?
+  createdAt   DateTime @default(now())
+}
+
+// Historical time-series data for individual nodes
+model NodeHistory {
+  id             Int      @id @default(autoincrement())
+  nodeId         String   // References NodeSnapshot.id
+  timestamp      DateTime @default(now())
+  
+  // Metrics at this point in time
+  status         String?
+  peerCount      Int?
+  latency        Float?
+  storageUsed    Float?
+  storageCapacity Float?
+  uptime         Float?
+  healthScore    Int?
+  
+  // Index for efficient time-series queries
+  @@index([nodeId, timestamp])
+  @@index([timestamp])
+}
+
+// Network-level aggregated snapshots
+model NetworkSnapshot {
+  id                    Int      @id @default(autoincrement())
+  timestamp             DateTime @default(now())
+  
+  // Aggregated metrics
+  totalNodes            Int      @default(0)
+  onlineNodes           Int      @default(0)
+  offlineNodes          Int      @default(0)
+  healthyNodes          Int      @default(0)  // health >= 80
+  warningNodes          Int      @default(0)  // 50 <= health < 80
+  criticalNodes         Int      @default(0)  // health < 50
+  
+  averagePeerCount      Float?
+  averageLatency        Float?
+  totalStorageCapacity  Float?
+  totalStorageUsed      Float?
+  
+  // Version distribution (JSON)
+  versionDistribution   String?  // JSON: { "v1.0": 10, "v2.0": 20 }
+  
+  // Region distribution (JSON)
+  regionDistribution    String?  // JSON: { "US": 15, "EU": 10 }
+  
+  @@index([timestamp])
+}
+
+// Alerts system
+model Alert {
+  id          String   @id @default(uuid())
+  nodeId      String?  // null for network-level alerts
+  type        String   // 'offline', 'latency_spike', 'peer_drop', 'storage_anomaly', 'network_issue'
+  severity    String   // 'low', 'medium', 'high', 'critical'
+  message     String
+  details     String?  // JSON string for additional data
+  acknowledged Boolean @default(false)
+  resolved    Boolean  @default(false)
+  resolvedAt  DateTime?
+  createdAt   DateTime @default(now())
+  
+  @@index([nodeId, createdAt])
+  @@index([severity, resolved, createdAt])
+  @@index([type, createdAt])
+}
+
