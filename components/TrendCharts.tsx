@@ -201,3 +201,4 @@ export function TrendCharts({ hours = 24, compact = false }: TrendChartsProps) {
   );
 }
 
+

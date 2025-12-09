@@ -24,39 +24,38 @@ export function CorrelationChart({
 }: CorrelationChartProps) {
   const data = useMemo(() => {
     return nodes
-      .filter(node => {
-        // Filter nodes with valid data for both metrics
-        if (xMetric === 'latency' && (!node.latency || node.latency === 0)) return false;
-        if (xMetric === 'peerCount' && node.peerCount === 0) return false;
-        if (xMetric === 'storageUsage' && (!node.storageUsed || !node.storageCapacity)) return false;
-        if (xMetric === 'uptime' && !node.uptime) return false;
-        
-        if (yMetric === 'latency' && (!node.latency || node.latency === 0)) return false;
-        if (yMetric === 'peerCount' && node.peerCount === 0) return false;
-        if (yMetric === 'storageUsage' && (!node.storageUsed || !node.storageCapacity)) return false;
-        
-        return true;
-      })
       .map(node => {
         const health = calculateHealthScore(node);
         
-        let x: number;
-        if (xMetric === 'latency') x = node.latency || 0;
-        else if (xMetric === 'peerCount') x = node.peerCount;
-        else if (xMetric === 'storageUsage') {
+        let x: number | null = null;
+        if (xMetric === 'latency') {
+          x = node.latency !== undefined ? node.latency : null;
+        } else if (xMetric === 'peerCount') {
+          x = node.peerCount !== undefined ? node.peerCount : null;
+        } else if (xMetric === 'storageUsage') {
           x = node.storageCapacity && node.storageUsed 
             ? (node.storageUsed / node.storageCapacity) * 100 
-            : 0;
-        } else x = (node.uptime || 0) / (24 * 3600); // uptime in days
+            : null;
+        } else {
+          x = node.uptime !== undefined ? (node.uptime / (24 * 3600)) : null; // uptime in days
+        }
         
-        let y: number;
-        if (yMetric === 'health') y = health.score;
-        else if (yMetric === 'latency') y = node.latency || 0;
-        else if (yMetric === 'peerCount') y = node.peerCount;
-        else {
+        let y: number | null = null;
+        if (yMetric === 'health') {
+          y = health.score;
+        } else if (yMetric === 'latency') {
+          y = node.latency !== undefined ? node.latency : null;
+        } else if (yMetric === 'peerCount') {
+          y = node.peerCount !== undefined ? node.peerCount : null;
+        } else {
           y = node.storageCapacity && node.storageUsed 
             ? (node.storageUsed / node.storageCapacity) * 100 
-            : 0;
+            : null;
+        }
+        
+        // Only include nodes where both x and y have valid numeric values
+        if (x === null || y === null || isNaN(x) || isNaN(y)) {
+          return null;
         }
         
         return {
@@ -66,7 +65,8 @@ export function CorrelationChart({
           status: node.status,
           health: health.score,
         };
-      });
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
   }, [nodes, xMetric, yMetric]);
 
   const getXLabel = () => {
@@ -97,7 +97,10 @@ export function CorrelationChart({
     return (
       <Card title={title || `${getYLabel()} vs ${getXLabel()}`}>
         <div className="text-center py-8 text-gray-500 dark:text-gray-400 text-sm">
-          Insufficient data to display correlation chart.
+          <p className="mb-2">Insufficient data to display correlation chart.</p>
+          <p className="text-xs">
+            This chart requires nodes with both {getXLabel().toLowerCase()} and {getYLabel().toLowerCase()} data.
+          </p>
         </div>
       </Card>
     );
@@ -159,4 +162,5 @@ export function CorrelationChart({
     </Card>
   );
 }
+
 
