@@ -1,10 +1,12 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useNodes } from '@/hooks/useNodes';
 import { calculateNetworkStats } from '@/lib/prpc';
 import { StatCard } from '@/components/StatCard';
 import { DistributionChart } from '@/components/DistributionChart';
 import { AlertsPanel } from '@/components/AlertsPanel';
+import { TrendCharts } from '@/components/TrendCharts';
 import { Network, Server, HardDrive, Activity, TrendingUp, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { formatBytes } from '@/lib/utils';
 import { Card } from '@/components/Card';
@@ -12,6 +14,7 @@ import { Tooltip } from '@/components/Tooltip';
 import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import { calculateHealthScore } from '@/lib/health';
+import { saveNetworkSnapshot } from '@/lib/clientHistory';
 
 export default function DashboardPage() {
   const { data, isLoading, error } = useNodes({ page: 1, pageSize: 500 });
@@ -19,6 +22,21 @@ export default function DashboardPage() {
   const totalNodes = data?.total ?? nodes.length;
   const stats = calculateNetworkStats(nodes);
   const validatorCount = stats.validatorCount || 0;
+
+  // Save network snapshot periodically (every 5 minutes)
+  useEffect(() => {
+    if (nodes.length === 0) return;
+    
+    // Save immediately
+    saveNetworkSnapshot(nodes);
+    
+    // Then save every 5 minutes
+    const interval = setInterval(() => {
+      saveNetworkSnapshot(nodes);
+    }, 5 * 60 * 1000);
+    
+    return () => clearInterval(interval);
+  }, [nodes]);
 
   if (isLoading) {
     return (
@@ -165,6 +183,9 @@ export default function DashboardPage() {
           type="bar"
         />
       </div>
+
+      {/* Trend Charts */}
+      <TrendCharts hours={24} compact={false} />
 
       {/* Quick Actions */}
       <Card title="Quick Actions">

@@ -9,6 +9,7 @@ import { Search, ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle } from 'lucide-r
 import { Card } from './Card';
 import { useClientAnalytics } from '@/hooks/useClientAnalytics';
 import { getRiskStatusColor, getRiskStatusLabel, getAnomalySeverityColor } from '@/lib/clientAnalytics';
+import { SavedFiltersPanel } from './SavedFiltersPanel';
 
 interface NodeTableProps {
   nodes: pNode[];
@@ -167,7 +168,7 @@ export function NodeTable({
 
   return (
     <Card>
-      <div className="mb-4">
+      <div className="mb-4 space-y-3">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -179,18 +180,25 @@ export function NodeTable({
               className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-            <input
-              type="checkbox"
-              checked={showAnomaliesOnly}
-              onChange={(e) => setShowAnomaliesOnly(e.target.checked)}
-              className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          <div className="flex items-center gap-3">
+            <SavedFiltersPanel
+              currentFilters={filters}
+              onApplyFilter={setFilters}
+              compact={true}
             />
-            <span className="flex items-center gap-1">
-              <AlertTriangle className="w-4 h-4" />
-              Show anomalies only
-            </span>
-          </label>
+            <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <input
+                type="checkbox"
+                checked={showAnomaliesOnly}
+                onChange={(e) => setShowAnomaliesOnly(e.target.checked)}
+                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <span className="flex items-center gap-1">
+                <AlertTriangle className="w-4 h-4" />
+                Show anomalies only
+              </span>
+            </label>
+          </div>
         </div>
       </div>
 

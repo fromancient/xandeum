@@ -3,9 +3,11 @@
 import dynamic from 'next/dynamic';
 import { useNodes } from '@/hooks/useNodes';
 import { Card } from '@/components/Card';
-import { MapPin } from 'lucide-react';
+import { MapPin, Activity, Server, HardDrive } from 'lucide-react';
 import { pNode } from '@/types';
 import { Skeleton } from '@/components/Skeleton';
+import { calculateHealthScore } from '@/lib/health';
+import { formatBytes } from '@/lib/utils';
 
 // Dynamically import the map component to disable SSR (Leaflet needs browser DOM)
 const NodeMap = dynamic(
@@ -126,33 +128,95 @@ export default function MapPage() {
         </div>
       </Card>
 
-      {/* Regional Breakdown */}
+      {/* Regional Breakdown with Enhanced Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {Object.entries(nodesByRegion).map(([region, regionNodes]) => {
-          const onlineCount = regionNodes.filter(n => n.status === 'online').length;
-          const offlineCount = regionNodes.filter(n => n.status === 'offline').length;
+        {Object.entries(nodesByRegion)
+          .sort(([, a], [, b]) => b.length - a.length)
+          .map(([region, regionNodes]) => {
+            const onlineCount = regionNodes.filter(n => n.status === 'online').length;
+            const offlineCount = regionNodes.filter(n => n.status === 'offline').length;
+            const healthScores = regionNodes.map(n => calculateHealthScore(n));
+            const healthyCount = healthScores.filter(h => h.score >= 80).length;
+            const warningCount = healthScores.filter(h => h.score >= 50 && h.score < 80).length;
+            const criticalCount = healthScores.filter(h => h.score < 50).length;
+            
+            const totalStorage = regionNodes.reduce((sum, n) => sum + (n.storageUsed || 0), 0);
+            const totalCapacity = regionNodes.reduce((sum, n) => sum + (n.storageCapacity || 0), 0);
+            const avgPeerCount = regionNodes.length > 0
+              ? regionNodes.reduce((sum, n) => sum + (n.peerCount || 0), 0) / regionNodes.length
+              : 0;
+            const avgLatency = regionNodes
+              .filter(n => n.latency)
+              .reduce((sum, n) => sum + (n.latency || 0), 0) / regionNodes.filter(n => n.latency).length || 0;
 
-          return (
-            <Card key={region} className="p-4">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <MapPin className="w-4 h-4 text-gray-400" />
-                    <h3 className="font-semibold text-gray-900 dark:text-gray-100">
-                      {region}
-                    </h3>
+            return (
+              <Card key={region} className="p-4">
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <MapPin className="w-4 h-4 text-gray-400" />
+                      <h3 className="font-semibold text-gray-900 dark:text-gray-100">
+                        {region}
+                      </h3>
+                    </div>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">
+                      {regionNodes.length}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-500 mb-3">
+                      {onlineCount} online, {offlineCount} offline
+                    </p>
                   </div>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-1">
-                    {regionNodes.length}
-                  </p>
-                  <p className="text-sm text-gray-500 dark:text-gray-500">
-                    {onlineCount} online, {offlineCount} offline
-                  </p>
                 </div>
-              </div>
-            </Card>
-          );
-        })}
+                
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                      <Activity className="w-3 h-3" />
+                      Health
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-green-600 dark:text-green-400">{healthyCount}</span>
+                      <span className="text-yellow-600 dark:text-yellow-400">{warningCount}</span>
+                      <span className="text-red-600 dark:text-red-400">{criticalCount}</span>
+                    </div>
+                  </div>
+                  {avgPeerCount > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                        <Server className="w-3 h-3" />
+                        Avg Peers
+                      </span>
+                      <span className="text-gray-900 dark:text-gray-100 font-medium">
+                        {avgPeerCount.toFixed(1)}
+                      </span>
+                    </div>
+                  )}
+                  {avgLatency > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                        <Activity className="w-3 h-3" />
+                        Avg Latency
+                      </span>
+                      <span className="text-gray-900 dark:text-gray-100 font-medium">
+                        {avgLatency.toFixed(0)}ms
+                      </span>
+                    </div>
+                  )}
+                  {totalCapacity > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                        <HardDrive className="w-3 h-3" />
+                        Storage
+                      </span>
+                      <span className="text-gray-900 dark:text-gray-100 font-medium">
+                        {formatBytes(totalStorage)} / {formatBytes(totalCapacity)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </Card>
+            );
+          })}
       </div>
 
       {nodesWithLocation.length === 0 && (

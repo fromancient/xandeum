@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutDashboard, Network, GitCompare, Map, Share2, TrendingUp, Bell } from 'lucide-react';
+import { LayoutDashboard, Network, GitCompare, Map, Share2, TrendingUp, Bell, BarChart3 } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { cn } from '@/lib/utils';
 
@@ -10,6 +10,7 @@ const navItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/nodes', label: 'Nodes', icon: Network },
   { href: '/trends', label: 'Trends', icon: TrendingUp },
+  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
   { href: '/compare', label: 'Compare', icon: GitCompare },
   { href: '/map', label: 'Map', icon: Map },
   { href: '/alerts', label: 'Alerts', icon: Bell },
