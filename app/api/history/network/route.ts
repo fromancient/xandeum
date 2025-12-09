@@ -3,6 +3,8 @@ import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
+// Force Node runtime on Vercel so Prisma can load native bindings
+export const runtime = 'nodejs';
 
 export async function GET(req: Request) {
   try {
