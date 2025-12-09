@@ -5,28 +5,52 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const runtime = 'nodejs';
 
+// Helper to safely check if database is available
+async function isDbAvailable(): Promise<boolean> {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(req.url);
-    const nodeId = searchParams.get('nodeId');
-    const hours = Math.max(1, Math.min(720, parseInt(searchParams.get('hours') || '24', 10))); // up to 30 days
-    const since = new Date(Date.now() - hours * 60 * 60 * 1000);
+    // Check if database is available
+    const dbAvailable = await isDbAvailable();
 
-    const where: any = {
-      timestamp: { gte: since },
-    };
-
-    if (nodeId) {
-      where.nodeId = nodeId;
+    if (!dbAvailable) {
+      // No database - return empty history
+      return NextResponse.json({ history: [] });
     }
 
-    const history = await prisma.nodeHistory.findMany({
-      where,
-      orderBy: { timestamp: 'asc' },
-      take: nodeId ? 1000 : 5000, // Limit results for performance
-    });
+    try {
+      const { searchParams } = new URL(req.url);
+      const nodeId = searchParams.get('nodeId');
+      const hours = Math.max(1, Math.min(720, parseInt(searchParams.get('hours') || '24', 10))); // up to 30 days
+      const since = new Date(Date.now() - hours * 60 * 60 * 1000);
 
-    return NextResponse.json({ history });
+      const where: any = {
+        timestamp: { gte: since },
+      };
+
+      if (nodeId) {
+        where.nodeId = nodeId;
+      }
+
+      const history = await prisma.nodeHistory.findMany({
+        where,
+        orderBy: { timestamp: 'asc' },
+        take: nodeId ? 1000 : 5000, // Limit results for performance
+      });
+
+      return NextResponse.json({ history });
+    } catch (dbError) {
+      // Database error - return empty history
+      console.warn('Database unavailable, returning empty node history:', dbError);
+      return NextResponse.json({ history: [] });
+    }
   } catch (error) {
     console.error('API /history/nodes error:', error);
     return NextResponse.json(

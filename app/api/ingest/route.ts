@@ -9,18 +9,53 @@ export const revalidate = 0;
 // Ensure Node runtime on Vercel for Prisma + Node APIs
 export const runtime = 'nodejs';
 
+// Helper to safely check if database is available
+async function isDbAvailable(): Promise<boolean> {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function GET() {
   try {
-    const timestamp = new Date();
-    
-    // Fetch nodes
-    const nodes = await fetchAllpNodes();
-    
-    // Get previous node states for anomaly detection
-    const previousNodesMap = new Map<string, pNode>();
-    const previousSnapshots = await prisma.nodeSnapshot.findMany({
-      where: { id: { in: nodes.map(n => n.id) } },
-    });
+    // Check if database is available
+    const dbAvailable = await isDbAvailable();
+
+    if (!dbAvailable) {
+      // No database - just fetch and return live data without storing
+      const nodes = await fetchAllpNodes();
+      const networkStats = calculateNetworkStats(nodes);
+      const metrics = await fetchChainMetrics();
+      
+      return NextResponse.json({
+        ok: true,
+        nodes: nodes.length,
+        metrics: metrics || null,
+        alerts: 0,
+        networkStats: {
+          totalNodes: networkStats.totalNodes,
+          healthyNodes: 0,
+          warningNodes: 0,
+          criticalNodes: 0,
+        },
+        message: 'Database not available. Data fetched but not stored.',
+      });
+    }
+
+    try {
+      const timestamp = new Date();
+      
+      // Fetch nodes
+      const nodes = await fetchAllpNodes();
+      
+      // Get previous node states for anomaly detection
+      const previousNodesMap = new Map<string, pNode>();
+      const previousSnapshots = await prisma.nodeSnapshot.findMany({
+        where: { id: { in: nodes.map(n => n.id) } },
+      });
     
     // Build map of previous states (simplified - in production, fetch from NodeHistory)
     for (const snapshot of previousSnapshots) {
@@ -179,18 +214,39 @@ export async function GET() {
       });
     }
 
-    return NextResponse.json({
-      ok: true,
-      nodes: nodes.length,
-      metrics: metrics || null,
-      alerts: alerts.length,
-      networkStats: {
-        totalNodes: networkStats.totalNodes,
-        healthyNodes,
-        warningNodes,
-        criticalNodes,
-      },
-    });
+      return NextResponse.json({
+        ok: true,
+        nodes: nodes.length,
+        metrics: metrics || null,
+        alerts: alerts.length,
+        networkStats: {
+          totalNodes: networkStats.totalNodes,
+          healthyNodes,
+          warningNodes,
+          criticalNodes,
+        },
+      });
+    } catch (dbError) {
+      // Database error - fetch and return live data without storing
+      console.warn('Database unavailable during ingest, returning live data only:', dbError);
+      const nodes = await fetchAllpNodes();
+      const networkStats = calculateNetworkStats(nodes);
+      const metrics = await fetchChainMetrics();
+      
+      return NextResponse.json({
+        ok: true,
+        nodes: nodes.length,
+        metrics: metrics || null,
+        alerts: 0,
+        networkStats: {
+          totalNodes: networkStats.totalNodes,
+          healthyNodes: 0,
+          warningNodes: 0,
+          criticalNodes: 0,
+        },
+        message: 'Database not available. Data fetched but not stored.',
+      });
+    }
   } catch (error) {
     console.error('Ingest error:', error);
     return NextResponse.json(

@@ -7,6 +7,16 @@ export const revalidate = 0;
 // Ensure Node runtime on Vercel so Prisma native bindings load
 export const runtime = 'nodejs';
 
+// Helper to safely check if database is available
+async function isDbAvailable(): Promise<boolean> {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
@@ -14,58 +24,92 @@ export async function GET(req: Request) {
     const pageSize = Math.min(500, Math.max(10, parseInt(searchParams.get('pageSize') || '100', 10)));
     const skip = (page - 1) * pageSize;
 
-    const total = await prisma.nodeSnapshot.count();
+    // Check if database is available
+    const dbAvailable = await isDbAvailable();
 
-    // If DB empty, fetch live and return
-    if (total === 0) {
+    if (!dbAvailable) {
+      // No database - fetch live data
       const live = await fetchAllpNodes();
+      const paginated = live.slice(skip, skip + pageSize);
       return NextResponse.json({
-        nodes: live.slice(0, pageSize),
+        nodes: paginated,
         total: live.length,
+        page,
+        pageSize,
         source: 'live',
       });
     }
 
-    const rows = await prisma.nodeSnapshot.findMany({
-      skip,
-      take: pageSize,
-      orderBy: { updatedAt: 'desc' },
-    });
+    // Try to use database
+    try {
+      const total = await prisma.nodeSnapshot.count();
 
-    const nodes = rows.map((r) => ({
-      id: r.id,
-      publicKey: r.publicKey || undefined,
-      status: (r.status as any) || 'unknown',
-      softwareVersion: r.version || undefined,
-      peerCount: r.peerCount || 0,
-      lastSeen: r.lastSeen || undefined,
-      location: r.region
-        ? {
-            country: r.region,
-            region: r.region,
-            latitude: r.latitude || undefined,
-            longitude: r.longitude || undefined,
-          }
-        : undefined,
-      endpoint: undefined,
-      ipAddress: undefined,
-      storageCapacity: undefined,
-      storageUsed: undefined,
-      metadata: {
-        isValidator: r.isValidator,
-        voteAccount: r.voteAccount || undefined,
-        commission: r.commission ?? undefined,
-      },
-      rawData: {},
-    }));
+      // If DB empty, fetch live and return
+      if (total === 0) {
+        const live = await fetchAllpNodes();
+        const paginated = live.slice(skip, skip + pageSize);
+        return NextResponse.json({
+          nodes: paginated,
+          total: live.length,
+          page,
+          pageSize,
+          source: 'live',
+        });
+      }
 
-    return NextResponse.json({
-      nodes,
-      total,
-      page,
-      pageSize,
-      source: 'db',
-    });
+      const rows = await prisma.nodeSnapshot.findMany({
+        skip,
+        take: pageSize,
+        orderBy: { updatedAt: 'desc' },
+      });
+
+      const nodes = rows.map((r) => ({
+        id: r.id,
+        publicKey: r.publicKey || undefined,
+        status: (r.status as any) || 'unknown',
+        softwareVersion: r.version || undefined,
+        peerCount: r.peerCount || 0,
+        lastSeen: r.lastSeen || undefined,
+        location: r.region
+          ? {
+              country: r.region,
+              region: r.region,
+              latitude: r.latitude || undefined,
+              longitude: r.longitude || undefined,
+            }
+          : undefined,
+        endpoint: undefined,
+        ipAddress: undefined,
+        storageCapacity: undefined,
+        storageUsed: undefined,
+        metadata: {
+          isValidator: r.isValidator,
+          voteAccount: r.voteAccount || undefined,
+          commission: r.commission ?? undefined,
+        },
+        rawData: {},
+      }));
+
+      return NextResponse.json({
+        nodes,
+        total,
+        page,
+        pageSize,
+        source: 'db',
+      });
+    } catch (dbError) {
+      // Database error - fall back to live data
+      console.warn('Database unavailable, falling back to live data:', dbError);
+      const live = await fetchAllpNodes();
+      const paginated = live.slice(skip, skip + pageSize);
+      return NextResponse.json({
+        nodes: paginated,
+        total: live.length,
+        page,
+        pageSize,
+        source: 'live',
+      });
+    }
   } catch (error) {
     console.error('API /nodes error:', error);
     return NextResponse.json(
